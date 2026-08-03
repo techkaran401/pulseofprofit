@@ -433,7 +433,7 @@ class AdminLogin(BaseModel):
 
 @app.post("/api/vyavasthapak/login")
 def vyavasthapak_login(login_in: AdminLogin):
-    allowed_passcodes = ["vyavasthapak2026", "admin123", "bts2026"]
+    allowed_passcodes = ["vyavasthapak2026"]
     if login_in.passcode not in allowed_passcodes:
         raise HTTPException(status_code=401, detail="Invalid Vyavasthapak passcode")
     

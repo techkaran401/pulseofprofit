@@ -17,6 +17,7 @@ export interface Post {
   comments_count: number;
   comments: Comment[];
   imageUrl?: string;
+  mediaUrls?: string[];
   isLiked?: boolean;
   isReposted?: boolean;
 }

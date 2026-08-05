@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sliders, LineChart, BarChart2, Activity, Check, Download, RefreshCw } from 'lucide-react';
+import { Sliders } from 'lucide-react';
 
 export default function InteractiveAnalyticsWidget() {
   const [selectedIndicator, setSelectedIndicator] = useState<'RSI' | 'MACD' | 'Volume'>('RSI');

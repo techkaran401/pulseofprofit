@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import ProfileSidebar from '@/components/ProfileSidebar';
 import ShareModal from '@/components/ShareModal';
@@ -86,8 +86,9 @@ const fallbackPosts: Post[] = [
   }
 ];
 
-export default function PostDetail({ params }: { params: { id: string } }) {
-  const resolvedParams = params;
+export default function PostDetail() {
+  const routeParams = useParams();
+  const postId = (routeParams?.id as string) || '';
   const router = useRouter();
   const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
@@ -200,38 +201,40 @@ export default function PostDetail({ params }: { params: { id: string } }) {
         // First check custom posts in localStorage
         const savedCustom = localStorage.getItem('site_custom_posts');
         const custom: Post[] = savedCustom ? JSON.parse(savedCustom) : [];
-        const customFound = custom.find(p => p.id === resolvedParams.id);
+        const customFound = custom.find(p => p.id === postId);
         if (customFound) {
           setPost(customFound);
           setLoading(false);
           return;
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/posts/${resolvedParams.id}`);
+        const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`);
         if (res.ok) {
           const data = await res.json();
           setPost(data);
         } else {
-          const fb = fallbackPosts.find(p => p.id === resolvedParams.id) || null;
+          const fb = fallbackPosts.find(p => p.id === postId) || null;
           setPost(fb);
         }
       } catch (err) {
         console.warn("Backend offline, using fallback data.");
         const savedCustom = localStorage.getItem('site_custom_posts');
         const custom: Post[] = savedCustom ? JSON.parse(savedCustom) : [];
-        const customFound = custom.find(p => p.id === resolvedParams.id);
+        const customFound = custom.find(p => p.id === postId);
         if (customFound) {
           setPost(customFound);
         } else {
-          const fb = fallbackPosts.find(p => p.id === resolvedParams.id) || null;
+          const fb = fallbackPosts.find(p => p.id === postId) || null;
           setPost(fb);
         }
       } finally {
         setLoading(false);
       }
     };
-    fetchPost();
-  }, [resolvedParams.id]);
+    if (postId) {
+      fetchPost();
+    }
+  }, [postId]);
 
   // Handle Like Increment
   const handleLike = async () => {

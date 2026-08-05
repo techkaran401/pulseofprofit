@@ -5,14 +5,8 @@ import {
   TrendingUp, 
   Sparkles, 
   ArrowUpRight, 
-  ShieldCheck, 
-  Zap, 
-  LineChart, 
   Activity,
-  Layers,
-  ChevronRight,
-  Eye,
-  BarChart2
+  Eye
 } from 'lucide-react';
 
 export default function HeroHUD({ onExploreClick }: { onExploreClick?: () => void }) {

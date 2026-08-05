@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PieChart, TrendingUp, ShieldAlert, BarChart2, DollarSign, ArrowUpRight, Zap } from 'lucide-react';
+import { PieChart, TrendingUp } from 'lucide-react';
 
 export default function PortfolioDashboardWidget() {
   const holdings = [

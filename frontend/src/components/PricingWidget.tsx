@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Check, Sparkles, Zap, ShieldCheck } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 
 export default function PricingWidget() {
   const [isAnnual, setIsAnnual] = useState(true);

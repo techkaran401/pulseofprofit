@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Star, Quote, ShieldCheck } from 'lucide-react';
+import { Star, ShieldCheck } from 'lucide-react';
 
 interface Testimonial {
   quote: string;

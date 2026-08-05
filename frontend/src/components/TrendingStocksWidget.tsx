@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Flame, ArrowUpRight, ArrowDownRight, Activity, Zap, BarChart3 } from 'lucide-react';
+import { Flame } from 'lucide-react';
 
 interface HeatmapStock {
   ticker: string;

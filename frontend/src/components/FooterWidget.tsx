@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Activity, Send, ShieldCheck, Heart, Instagram, Twitter } from 'lucide-react';
+import { Send, Instagram, Twitter } from 'lucide-react';
 
 export default function FooterWidget() {
   return (

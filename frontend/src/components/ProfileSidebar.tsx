@@ -5,25 +5,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   X, 
-  Home, 
-  Compass, 
   Bookmark, 
-  MessageSquare, 
-  Bell, 
   Settings, 
   LifeBuoy, 
   LogOut, 
-  ArrowUpRight, 
   Edit2, 
   Check, 
   ArrowLeft, 
-  Trash2, 
-  Send, 
-  Smartphone,
-  ShieldAlert,
-  VolumeX,
-  Ban,
-  EyeOff
+  Trash2 
 } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
@@ -102,6 +91,11 @@ export default function ProfileSidebar({
   // Support sub-view states
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSubmitted, setSupportSubmitted] = useState(false);
+
+  // Author Chat States
+  const [selectedChatAuthor, setSelectedChatAuthor] = useState<string | null>(null);
+  const [newChatMessage, setNewChatMessage] = useState('');
+  const [chatMessages, setChatMessages] = useState<Record<string, { sender: string; text: string; time: string }[]>>({});
 
   // Local Toast inside sidebar
   const [sidebarToast, setSidebarToast] = useState<string | null>(null);

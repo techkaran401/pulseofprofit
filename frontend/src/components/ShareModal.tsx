@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Copy, Check, Share2 } from 'lucide-react';
+import { X, Copy, Check } from 'lucide-react';
 
 interface ShareModalProps {
   isOpen: boolean;

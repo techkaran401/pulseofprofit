@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Newspaper, Send, Sparkles } from 'lucide-react';
+import { ArrowRight, Send, Sparkles } from 'lucide-react';
 
 interface PinnedPostProps {
   id: string;

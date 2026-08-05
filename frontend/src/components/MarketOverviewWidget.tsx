@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, Globe, Flame, ShieldAlert, ArrowUpRight, DollarSign, Layers } from 'lucide-react';
+import { TrendingUp, TrendingDown, Globe } from 'lucide-react';
 
 interface MarketItem {
   name: string;

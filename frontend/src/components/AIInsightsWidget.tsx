@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Brain, CheckCircle2, ShieldCheck, Zap, ArrowUpRight, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Sparkles, Brain, ArrowUpRight } from 'lucide-react';
 
 interface AIInsight {
   ticker: string;

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Sun, Moon, User, Menu, Bell, CheckCheck, Trash2, Sparkles, Activity, X } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {

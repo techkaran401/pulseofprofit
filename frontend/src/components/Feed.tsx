@@ -352,7 +352,13 @@ export default function Feed({
   const visiblePosts = filteredPosts.filter(post => 
     !blockedAuthors.includes(post.author) && 
     !mutedAuthors.includes(post.author) &&
-    !reportedPostIds.includes(post.id)
+    !reportedPostIds.includes(post.id) &&
+    (
+      post.author.toUpperCase().includes('SHOBIN') ||
+      post.author.toUpperCase().includes('ADMIN') ||
+      post.author.toUpperCase().includes('PULSE') ||
+      post.title.toUpperCase().includes('BULLETIN')
+    )
   );
 
   return (
@@ -392,9 +398,9 @@ export default function Feed({
           ))}
         </div>
 
-        {/* Search Bar & Create Post Button */}
+        {/* Search Bar */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
+          <div className="relative flex-1 sm:w-72">
             <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#A0A7B5]">
               <Search className="w-4 h-4" />
             </span>
@@ -407,31 +413,8 @@ export default function Feed({
               className="w-full bg-[#0D1624] border border-white/10 rounded-[20px] pl-10 pr-4 py-2.5 text-xs text-white placeholder-[#A0A7B5] focus:outline-none focus:border-[#42E8FF] shadow-inner transition-colors"
             />
           </div>
-
-          <button
-            onClick={() => {
-              if (!token) {
-                openAuthModal('login');
-              } else {
-                setIsCreatePostModalOpen(true);
-              }
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-[20px] shadow-lg shadow-emerald-500/20 shrink-0 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create Post</span>
-          </button>
         </div>
       </div>
-
-      <CreatePostModal
-        isOpen={isCreatePostModalOpen}
-        onClose={() => setIsCreatePostModalOpen(false)}
-        onPostCreated={() => {
-          showToast('Post created successfully!');
-          fetchPosts();
-        }}
-      />
 
       {/* AI Scanning Alert */}
       {aiScanningPostId && (
@@ -518,18 +501,6 @@ export default function Feed({
                     </div>
 
                     <div className="flex items-center space-x-2 relative z-10">
-                      {/* Subscribe Button */}
-                      <button
-                        onClick={(e) => handleSubscribeToggle(post.author, e)}
-                        className={`text-xs font-bold py-1 px-3.5 rounded-full transition-all ${
-                          subscribedAuthors.includes(post.author)
-                            ? 'text-[#A0A7B5] bg-[#0D1624] border border-white/10'
-                            : 'text-[#42E8FF] bg-[#42E8FF]/15 border border-[#42E8FF]/30 hover:bg-[#42E8FF]/30'
-                        }`}
-                      >
-                        {subscribedAuthors.includes(post.author) ? 'Subscribed' : 'Subscribe'}
-                      </button>
-
                       {/* Dropdown Options */}
                       <div className="relative">
                         <button
@@ -557,23 +528,6 @@ export default function Feed({
                               >
                                 <Link2 className="w-4 h-4 text-[#A0A7B5]" />
                                 <span>Copy link</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => handleSubscribeToggle(post.author, e)}
-                                className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors"
-                              >
-                                {subscribedAuthors.includes(post.author) ? (
-                                  <>
-                                    <UserMinus className="w-4 h-4 text-[#A0A7B5]" />
-                                    <span>Unfollow</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserPlus className="w-4 h-4 text-[#A0A7B5]" />
-                                    <span>Follow</span>
-                                  </>
-                                )}
                               </button>
 
                               <button
@@ -645,14 +599,36 @@ export default function Feed({
                     </p>
                   </div>
 
-                  {/* Attached Image */}
-                  {post.imageUrl && (
-                    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0D1624] aspect-[16/9] max-h-96 w-full max-w-lg">
-                      <img 
-                        src={post.imageUrl.startsWith('/') ? `${apiBaseUrl}${post.imageUrl}` : post.imageUrl} 
-                        alt="Bulletin Visual"
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      />
+                  {/* Attached Media (Photos / Videos) */}
+                  {((post.mediaUrls && post.mediaUrls.length > 0) || post.imageUrl) && (
+                    <div className="space-y-2 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+                        {(post.mediaUrls && post.mediaUrls.length > 0 
+                          ? post.mediaUrls 
+                          : [post.imageUrl!]
+                        ).map((media, idx) => {
+                          const fullUrl = media.startsWith('/') ? `${apiBaseUrl}${media}` : media;
+                          const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(media);
+
+                          return (
+                            <div key={idx} className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0D1624] aspect-[16/9] w-full">
+                              {isVideo ? (
+                                <video 
+                                  src={fullUrl} 
+                                  controls 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : (
+                                <img 
+                                  src={fullUrl} 
+                                  alt={`Bulletin Media ${idx + 1}`}
+                                  className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 

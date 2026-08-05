@@ -8,7 +8,7 @@ import ProfileSidebar from '@/components/ProfileSidebar';
 import ShareModal from '@/components/ShareModal';
 import { ArrowLeft, Heart, MessageSquare, Repeat2, Share2, Send, MoreHorizontal, X, Bookmark, Download, Sparkles, EyeOff, VolumeX, Ban, AlertTriangle, Link2, UserMinus, UserPlus } from 'lucide-react';
 
-import { API_BASE_URL } from '@/context/AuthContext';
+import { API_BASE_URL, useAuth } from '@/context/AuthContext';
 
 
 import { Post, Comment } from '@/types/post';
@@ -89,6 +89,7 @@ const fallbackPosts: Post[] = [
 export default function PostDetail({ params }: { params: { id: string } }) {
   const resolvedParams = params;
   const router = useRouter();
+  const { user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -261,7 +262,8 @@ export default function PostDetail({ params }: { params: { id: string } }) {
   // Submit Comment
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!post || !commentAuthor.trim() || !commentContent.trim()) return;
+    const authorName = user?.name || commentAuthor || "Member";
+    if (!post || !commentContent.trim()) return;
     setSubmittingComment(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts/${post.id}/comment`, {
@@ -270,7 +272,7 @@ export default function PostDetail({ params }: { params: { id: string } }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          author: commentAuthor,
+          author: authorName,
           content: commentContent,
         }),
       });
@@ -280,21 +282,21 @@ export default function PostDetail({ params }: { params: { id: string } }) {
         setCommentContent('');
         showToast("Comment posted successfully!");
       } else {
-        appendMockComment();
+        appendMockComment(authorName);
       }
     } catch (err) {
-      appendMockComment();
+      appendMockComment(authorName);
     } finally {
       setSubmittingComment(false);
     }
   };
 
-  const appendMockComment = () => {
+  const appendMockComment = (authorName: string) => {
     if (!post) return;
     const newComment: Comment = {
       id: `c_mock_${Date.now()}`,
-      author: commentAuthor,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${commentAuthor}`,
+      author: authorName,
+      avatar: user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authorName}`,
       content: commentContent,
       timestamp: "Just now"
     };
@@ -442,28 +444,6 @@ export default function PostDetail({ params }: { params: { id: string } }) {
 
               {/* Post Controls */}
               <div className="flex items-center space-x-2 relative">
-                {/* Subscribe Button */}
-                <button
-                  onClick={() => {
-                    if (subscribedAuthors.includes(post.author)) {
-                      saveSubscribedAuthors(subscribedAuthors.filter(a => a !== post.author));
-                      showToast(`Unsubscribed from ${post.author}`);
-                      addActivity(`Unsubscribed from ${post.author}`);
-                    } else {
-                      saveSubscribedAuthors([...subscribedAuthors, post.author]);
-                      showToast(`Subscribed to ${post.author}!`);
-                      addActivity(`Subscribed to ${post.author}`);
-                    }
-                  }}
-                  className={`text-xs font-bold py-1 px-3.5 rounded-full transition-all ${
-                    subscribedAuthors.includes(post.author)
-                      ? 'text-[#A0A7B5] bg-[#0D1624] border border-white/10'
-                      : 'text-[#42E8FF] bg-[#42E8FF]/15 border border-[#42E8FF]/30 hover:bg-[#42E8FF]/30'
-                  }`}
-                >
-                  {subscribedAuthors.includes(post.author) ? 'Subscribed' : 'Subscribe'}
-                </button>
-
                 {/* Three Dot Options */}
                 <div className="relative">
                   <button
@@ -493,34 +473,6 @@ export default function PostDetail({ params }: { params: { id: string } }) {
                         >
                           <Link2 className="w-4 h-4 text-[#A0A7B5]" />
                           <span>Copy link</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            if (subscribedAuthors.includes(post.author)) {
-                              saveSubscribedAuthors(subscribedAuthors.filter(a => a !== post.author));
-                              showToast(`Unsubscribed from ${post.author}`);
-                              addActivity(`Unsubscribed from ${post.author}`);
-                            } else {
-                              saveSubscribedAuthors([...subscribedAuthors, post.author]);
-                              showToast(`Subscribed to ${post.author}!`);
-                              addActivity(`Subscribed to ${post.author}`);
-                            }
-                            setActiveThreeDotPostId(null);
-                          }}
-                          className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors"
-                        >
-                          {subscribedAuthors.includes(post.author) ? (
-                            <>
-                              <UserMinus className="w-4 h-4 text-[#A0A7B5]" />
-                              <span>Unfollow</span>
-                            </>
-                          ) : (
-                            <>
-                              <UserPlus className="w-4 h-4 text-[#A0A7B5]" />
-                              <span>Follow</span>
-                            </>
-                          )}
                         </button>
 
                         <button
@@ -756,17 +708,14 @@ export default function PostDetail({ params }: { params: { id: string } }) {
 
           {/* Post Comment Form */}
           <form onSubmit={handleCommentSubmit} className="space-y-4 p-5 rounded-2xl glass-panel border border-white/10">
-            <h3 className="font-display font-bold text-sm text-white">Leave a comment</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Your name"
-                required
-                value={commentAuthor}
-                onChange={(e) => setCommentAuthor(e.target.value)}
-                className="w-full glass-input rounded-xl px-4 py-2.5 text-xs text-white"
-              />
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold text-sm text-white">Leave a comment</h3>
+              {user && (
+                <div className="flex items-center space-x-2 text-xs text-[#A0A7B5]">
+                  <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full bg-slate-800" />
+                  <span>Posting as <strong className="text-white">{user.name}</strong></span>
+                </div>
+              )}
             </div>
 
             <div className="relative">

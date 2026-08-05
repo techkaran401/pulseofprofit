@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Activity, Send, ShieldCheck, Heart } from 'lucide-react';
+import { Activity, Send, ShieldCheck, Heart, Instagram, Twitter } from 'lucide-react';
 
 export default function FooterWidget() {
   return (
@@ -25,20 +25,34 @@ export default function FooterWidget() {
           </p>
         </div>
 
-        {/* Quick Links */}
+        {/* Social Navigation Links */}
         <div className="md:col-span-3 space-y-3">
-          <h4 className="text-sm font-bold text-white font-display">Navigation</h4>
-          <ul className="space-y-2 text-xs text-[#A0A7B5]">
-            <li><a href="#" className="hover:text-[#42E8FF] transition-colors">Market Overview</a></li>
-            <li><a href="#ai-insights" className="hover:text-[#42E8FF] transition-colors">AI Investment Insights</a></li>
-            <li><a href="#bulletins-feed" className="hover:text-[#42E8FF] transition-colors">Daily Bulletins Feed</a></li>
-            <li><a href="https://t.me/PulseOfProfitnews" target="_blank" rel="noreferrer" className="hover:text-[#42E8FF] transition-colors">Telegram Community</a></li>
+          <h4 className="text-sm font-bold text-white font-display">Connect With Us</h4>
+          <ul className="space-y-3 text-xs text-[#A0A7B5]">
+            <li>
+              <a href="https://instagram.com" target="_blank" rel="noreferrer" className="flex items-center space-x-2 hover:text-[#42E8FF] transition-colors">
+                <Instagram className="w-4 h-4 text-pink-500" />
+                <span>Instagram</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://twitter.com" target="_blank" rel="noreferrer" className="flex items-center space-x-2 hover:text-[#42E8FF] transition-colors">
+                <Twitter className="w-4 h-4 text-sky-400" />
+                <span>Twitter / X</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://t.me/PulseOfProfitnews" target="_blank" rel="noreferrer" className="flex items-center space-x-2 hover:text-[#42E8FF] transition-colors">
+                <Send className="w-4 h-4 text-cyan-400" />
+                <span>Telegram Community</span>
+              </a>
+            </li>
           </ul>
         </div>
 
         {/* Newsletter Signup */}
         <div className="md:col-span-4 space-y-3">
-          <h4 className="text-sm font-bold text-white font-display">Subscribe to Bulletin Digest</h4>
+          <h4 className="text-sm font-bold text-white font-display">Market Bulletin Digest</h4>
           <p className="text-xs text-[#A0A7B5]">Receive daily morning market telemetry directly to your inbox.</p>
 
           <form onSubmit={(e) => e.preventDefault()} className="flex items-center space-x-2 pt-1">

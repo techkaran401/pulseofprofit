@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export interface UserProfile {
   email: string;
   name: string;
+  mob_no?: string;
   avatar: string;
   bio: string;
 }
@@ -18,8 +19,9 @@ interface AuthContextType {
   openAuthModal: (mode?: 'login' | 'register') => void;
   closeAuthModal: () => void;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, mob_no: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUserProfile: (updated: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,13 +33,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('bts_token');
+    const savedUser = localStorage.getItem('bts_user');
     if (savedToken) {
       setToken(savedToken);
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+          setIsAuthModalOpen(false);
+        } catch (e) {}
+      }
       fetchUserProfile(savedToken);
     } else {
       setIsLoadingAuth(false);
@@ -55,23 +64,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok) {
         const data = await res.json();
         setUser(data);
+        localStorage.setItem('bts_user', JSON.stringify(data));
         setIsAuthModalOpen(false);
       } else {
         localStorage.removeItem('bts_token');
+        localStorage.removeItem('bts_user');
         setToken(null);
         setUser(null);
         setIsAuthModalOpen(true);
       }
     } catch (err) {
       console.warn('Backend offline or unreachable during auth check:', err);
-      setIsAuthModalOpen(true);
+      // Keep cached user if offline
+      if (!user) {
+        setIsAuthModalOpen(true);
+      }
     } finally {
       setIsLoadingAuth(false);
     }
   };
 
-  const openAuthModal = (mode: 'login' | 'register' = 'login') => {
-    setAuthMode(mode);
+  const openAuthModal = (mode: 'login' | 'register' = 'register') => {
+    setAuthMode('register');
     setIsAuthModalOpen(true);
   };
 
@@ -96,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await res.json();
       localStorage.setItem('bts_token', data.access_token);
+      localStorage.setItem('bts_user', JSON.stringify(data.user));
       setToken(data.access_token);
       setUser(data.user);
       setIsAuthModalOpen(false);
@@ -107,12 +122,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, mob_no: string, email: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, mob_no, email, password })
       });
 
       if (!res.ok) {
@@ -122,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await res.json();
       localStorage.setItem('bts_token', data.access_token);
+      localStorage.setItem('bts_user', JSON.stringify(data.user));
       setToken(data.access_token);
       setUser(data.user);
       setIsAuthModalOpen(false);
@@ -135,9 +151,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('bts_token');
+    localStorage.removeItem('bts_user');
     setToken(null);
     setUser(null);
     setIsAuthModalOpen(true);
+  };
+
+  const updateUserProfile = (updated: Partial<UserProfile>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const nextUser = { ...prev, ...updated };
+      localStorage.setItem('bts_user', JSON.stringify(nextUser));
+      return nextUser;
+    });
   };
 
   return (
@@ -152,7 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         closeAuthModal,
         login,
         register,
-        logout
+        logout,
+        updateUserProfile
       }}
     >
       {children}

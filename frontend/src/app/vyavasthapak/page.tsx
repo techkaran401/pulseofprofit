@@ -30,7 +30,8 @@ import {
   Check,
   UploadCloud,
   Image as ImageIcon,
-  X
+  X,
+  EyeOff
 } from 'lucide-react';
 
 import { API_BASE_URL } from '@/context/AuthContext';
@@ -55,12 +56,15 @@ interface PostItem {
   content: string;
   likes: number;
   comments_count: number;
+  comments?: any[];
   imageUrl?: string;
+  mediaUrls?: string[];
 }
 
 interface UserItem {
   email: string;
   name: string;
+  mob_no?: string;
   avatar: string;
   role: string;
   is_blocked: boolean;
@@ -79,9 +83,17 @@ interface ReportItem {
 
 export default function VyavasthapakAdminPage() {
   const [passcode, setPasscode] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  // Admin Register Form State
+  const [regName, setRegName] = useState('');
+  const [regMobNo, setRegMobNo] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPasscode, setRegPasscode] = useState('');
 
   // Active Tab: 'overview' | 'posts' | 'publish' | 'users' | 'reports'
   const [activeTab, setActiveTab] = useState<'overview' | 'posts' | 'publish' | 'users' | 'reports'>('overview');
@@ -97,42 +109,98 @@ export default function VyavasthapakAdminPage() {
 
   // Publish Bulletin Form
   const [bulletinTitle, setBulletinTitle] = useState('PULSE OF PROFIT BULLETIN 🗞️');
-  const [bulletinAuthor, setBulletinAuthor] = useState('SHOBIN SHEIKH (ADMIN)');
+  const [bulletinAuthor, setBulletinAuthor] = useState('VYAVASTHAPAK ADMIN');
   const [bulletinContent, setBulletinContent] = useState('');
   const [bulletinImageUrl, setBulletinImageUrl] = useState('');
   const [publishing, setPublishing] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+  // Manage Post Modal (Manual Likes & Fake Comments)
+  const [activeManagePost, setActiveManagePost] = useState<PostItem | null>(null);
+  const [manualLikesInput, setManualLikesInput] = useState<number>(0);
+  const [fakeCommentAuthor, setFakeCommentAuthor] = useState('');
+  const [fakeCommentAvatar, setFakeCommentAvatar] = useState('');
+  const [fakeCommentContent, setFakeCommentContent] = useState('');
+
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArr = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...filesArr]);
+      const newPreviews = filesArr.map(file => ({
+        url: URL.createObjectURL(file),
+        isVideo: file.type.startsWith('video/')
+      }));
+      setPreviews(prev => [...prev, ...newPreviews]);
     }
   };
 
-  const handleRemovePhoto = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleRemoveMedia = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Check existing session
+  // Check existing session and admin existence
   useEffect(() => {
     const savedToken = localStorage.getItem('vyavasthapak_token');
     if (savedToken) {
       setIsAuthenticated(true);
       fetchDashboardData();
+    } else {
+      checkHasAdmin();
     }
   }, []);
+
+  const checkHasAdmin = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vyavasthapak/has-admin`);
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.has_admin) {
+          setAuthMode('register');
+        }
+      }
+    } catch (e) {}
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 4000);
+  };
+
+  const handleAdminRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vyavasthapak/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: regName,
+          mob_no: regMobNo,
+          email: regEmail,
+          passcode: regPasscode
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('vyavasthapak_token', data.access_token);
+        setIsAuthenticated(true);
+        showToast('Admin Registered & Authenticated!');
+        fetchDashboardData();
+      } else {
+        const err = await res.json();
+        setAuthError(err.detail || 'Admin registration failed');
+      }
+    } catch (err) {
+      setAuthError('Connection failed to backend server');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -151,22 +219,14 @@ export default function VyavasthapakAdminPage() {
         const data = await res.json();
         localStorage.setItem('vyavasthapak_token', data.access_token);
         setIsAuthenticated(true);
-        showToast('Successfully authenticated into Vyavasthapak Admin Panel');
+        showToast('Authenticated into Vyavasthapak Admin Panel');
         fetchDashboardData();
       } else {
         const err = await res.json();
         setAuthError(err.detail || 'Invalid Passcode');
       }
     } catch (err) {
-      // Fallback local verification if backend isn't reachable
-      if (['vyavasthapak2026', 'admin123', 'bts2026'].includes(passcode)) {
-        localStorage.setItem('vyavasthapak_token', 'vyavasthapak_admin_token_2026');
-        setIsAuthenticated(true);
-        showToast('Authenticated into Vyavasthapak (Offline Mode)');
-        fetchDashboardData();
-      } else {
-        setAuthError('Connection failed and passcode is invalid');
-      }
+      setAuthError('Connection failed to backend server');
     } finally {
       setAuthLoading(false);
     }
@@ -267,6 +327,73 @@ export default function VyavasthapakAdminPage() {
     }
   };
 
+  const handleSaveManualLikes = async (postId: string, newLikes: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vyavasthapak/posts/${postId}/manual-likes`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({ likes: Number(newLikes) })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setPosts(prev => prev.map(p => p.id === postId ? updated : p));
+        if (activeManagePost?.id === postId) setActiveManagePost(updated);
+        showToast('Post likes count updated!');
+        fetchDashboardData();
+      }
+    } catch (err) {
+      showToast('Failed to update likes count');
+    }
+  };
+
+  const handleAddFakeComment = async (postId: string) => {
+    if (!fakeCommentAuthor.trim() || !fakeCommentContent.trim()) {
+      showToast('Author name and comment text are required');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vyavasthapak/posts/${postId}/manual-comments`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          author: fakeCommentAuthor,
+          content: fakeCommentContent,
+          avatar: fakeCommentAvatar || undefined
+        })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setPosts(prev => prev.map(p => p.id === postId ? updated : p));
+        if (activeManagePost?.id === postId) setActiveManagePost(updated);
+        setFakeCommentAuthor('');
+        setFakeCommentContent('');
+        setFakeCommentAvatar('');
+        showToast('Custom comment added!');
+        fetchDashboardData();
+      }
+    } catch (err) {
+      showToast('Failed to add custom comment');
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/vyavasthapak/posts/${postId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders()
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setPosts(prev => prev.map(p => p.id === postId ? updated : p));
+        if (activeManagePost?.id === postId) setActiveManagePost(updated);
+        showToast('Comment deleted');
+        fetchDashboardData();
+      }
+    } catch (err) {
+      showToast('Failed to delete comment');
+    }
+  };
+
   const handlePublishBulletin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bulletinContent.trim()) {
@@ -276,13 +403,18 @@ export default function VyavasthapakAdminPage() {
 
     setPublishing(true);
     try {
-      let finalImageUrl: string | null = bulletinImageUrl || null;
+      let mediaUrls: string[] = [];
+      if (bulletinImageUrl.trim()) {
+        mediaUrls.push(bulletinImageUrl.trim());
+      }
 
-      if (selectedFile) {
+      if (selectedFiles.length > 0) {
         const formData = new FormData();
-        formData.append('file', selectedFile);
+        selectedFiles.forEach(file => {
+          formData.append('files', file);
+        });
 
-        const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+        const uploadRes = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('vyavasthapak_token') || ''}`
@@ -292,9 +424,9 @@ export default function VyavasthapakAdminPage() {
 
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
-          finalImageUrl = uploadData.url;
+          mediaUrls = [...mediaUrls, ...(uploadData.urls || [])];
         } else {
-          showToast('Failed to upload image. Publishing without image...');
+          showToast('Failed to upload media files. Publishing text content...');
         }
       }
 
@@ -305,7 +437,8 @@ export default function VyavasthapakAdminPage() {
           title: bulletinTitle,
           author: bulletinAuthor,
           content: bulletinContent,
-          imageUrl: finalImageUrl
+          imageUrl: mediaUrls.length > 0 ? mediaUrls[0] : null,
+          mediaUrls: mediaUrls
         })
       });
 
@@ -314,7 +447,8 @@ export default function VyavasthapakAdminPage() {
         setPosts(prev => [newPost, ...prev]);
         setBulletinContent('');
         setBulletinImageUrl('');
-        handleRemovePhoto();
+        setSelectedFiles([]);
+        setPreviews([]);
         showToast('Official Bulletin published successfully!');
         setActiveTab('posts');
         fetchDashboardData();
@@ -386,8 +520,34 @@ export default function VyavasthapakAdminPage() {
               </div>
               <h2 className="text-2xl font-extrabold text-white tracking-tight">Vyavasthapak Gate</h2>
               <p className="text-xs text-[#A0A7B5]">
-                Enter the administrator passcode to access platform telemetry, moderation, and bulletin tools.
+                Administrator authentication portal for Pulse of Profit platform.
               </p>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex bg-[#0D1624] p-1 rounded-xl mb-6 border border-white/10">
+              <button
+                type="button"
+                onClick={() => { setAuthError(''); setAuthMode('login'); }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+                  authMode === 'login'
+                    ? 'bg-[#42E8FF] text-black font-bold shadow-md'
+                    : 'text-[#A0A7B5] hover:text-white'
+                }`}
+              >
+                Admin Login
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthError(''); setAuthMode('register'); }}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+                  authMode === 'register'
+                    ? 'bg-[#42E8FF] text-black font-bold shadow-md'
+                    : 'text-[#A0A7B5] hover:text-white'
+                }`}
+              >
+                Admin Register
+              </button>
             </div>
 
             {authError && (
@@ -397,39 +557,132 @@ export default function VyavasthapakAdminPage() {
               </div>
             )}
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-2">
-                  Admin Passcode
-                </label>
-                <div className="relative">
-                  <Key className="w-4 h-4 text-[#A0A7B5] absolute left-3.5 top-3.5" />
+            {authMode === 'login' ? (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-2">
+                    Admin Passcode
+                  </label>
+                  <div className="relative">
+                    <Key className="w-4 h-4 text-[#A0A7B5] absolute left-3.5 top-3.5" />
+                    <input
+                      type={showPasscode ? 'text' : 'password'}
+                      value={passcode}
+                      onChange={(e) => setPasscode(e.target.value)}
+                      placeholder="Enter administrator passcode"
+                      className="w-full pl-10 pr-10 py-3 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-sm text-white placeholder:text-[#A0A7B5]/60 transition-colors"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasscode(!showPasscode)}
+                      className="absolute right-3 top-3.5 text-[#A0A7B5] hover:text-white transition-colors"
+                      title={showPasscode ? 'Hide passcode' : 'Show passcode'}
+                    >
+                      {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3 rounded-xl btn-cyan-gradient font-bold text-black text-sm shadow-lg shadow-[#42E8FF]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                >
+                  {authLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                  ) : (
+                    <>
+                      <span>Authenticate Admin</span>
+                      <ShieldCheck className="w-4 h-4 text-black" />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAdminRegister} className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-1">
+                    Full Name
+                  </label>
                   <input
-                    type="password"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-sm text-white placeholder:text-[#A0A7B5]/60 transition-colors"
+                    type="text"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder="Administrator Name"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-xs text-white"
                     required
                   />
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full py-3 rounded-xl btn-cyan-gradient font-bold text-black text-sm shadow-lg shadow-[#42E8FF]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
-              >
-                {authLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                ) : (
-                  <>
-                    <span>Authenticate</span>
-                    <ShieldCheck className="w-4 h-4 text-black" />
-                  </>
-                )}
-              </button>
-            </form>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-1">
+                    Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={regMobNo}
+                    onChange={(e) => setRegMobNo(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-xs text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    placeholder="admin@pulseofprofit.com"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-xs text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#A0A7B5] mb-1">
+                    Set Admin Passcode
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasscode ? 'text' : 'password'}
+                      value={regPasscode}
+                      onChange={(e) => setRegPasscode(e.target.value)}
+                      placeholder="Set passcode for admin access"
+                      className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] focus:outline-none text-xs text-white"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasscode(!showPasscode)}
+                      className="absolute right-3 top-2.5 text-[#A0A7B5] hover:text-white transition-colors"
+                      title={showPasscode ? 'Hide passcode' : 'Show passcode'}
+                    >
+                      {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full mt-2 py-3 rounded-xl btn-cyan-gradient font-bold text-black text-xs uppercase tracking-wider shadow-lg shadow-[#42E8FF]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+                >
+                  {authLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                  ) : (
+                    <>
+                      <span>Register & Create Admin</span>
+                      <ShieldCheck className="w-4 h-4 text-black" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
 
             <div className="mt-6 pt-4 border-t border-white/5 text-center text-[11px] text-[#A0A7B5]">
               Protected Endpoint: <span className="font-mono text-[#42E8FF]">/api/vyavasthapak</span>
@@ -642,6 +895,17 @@ export default function VyavasthapakAdminPage() {
                           <span>❤️ {post.likes}</span>
                           <span>💬 {post.comments_count}</span>
                         </div>
+                        <button
+                          onClick={() => {
+                            setActiveManagePost(post);
+                            setManualLikesInput(post.likes);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-[#42E8FF]/10 hover:bg-[#42E8FF]/20 text-[#42E8FF] border border-[#42E8FF]/30 text-xs font-bold flex items-center space-x-1 transition-all"
+                          title="Manage likes & custom comments"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Manage</span>
+                        </button>
                         <Link
                           href={`/posts/${post.id}`}
                           target="_blank"
@@ -661,6 +925,115 @@ export default function VyavasthapakAdminPage() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* MANAGE ENGAGEMENT MODAL (Likes & Fake Comments) */}
+          {activeManagePost && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+              <div className="w-full max-w-lg bg-[#0D1624] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <span className="text-[10px] text-[#42E8FF] font-mono uppercase font-bold">Post #{activeManagePost.id}</span>
+                    <h3 className="text-base font-bold text-white line-clamp-1">{activeManagePost.title}</h3>
+                  </div>
+                  <button
+                    onClick={() => setActiveManagePost(null)}
+                    className="p-1.5 rounded-full text-slate-400 hover:text-white bg-white/5"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Section 1: Manual Likes Count */}
+                <div className="space-y-2 p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-1.5">
+                    <span>Set Likes Count</span>
+                  </h4>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="number"
+                      min="0"
+                      value={manualLikesInput}
+                      onChange={(e) => setManualLikesInput(Number(e.target.value))}
+                      className="w-32 px-3 py-2 rounded-xl bg-[#050505] border border-white/10 text-white font-bold text-sm focus:outline-none focus:border-[#42E8FF]"
+                    />
+                    <button
+                      onClick={() => handleSaveManualLikes(activeManagePost.id, manualLikesInput)}
+                      className="px-4 py-2 rounded-xl btn-cyan-gradient text-xs font-bold text-black"
+                    >
+                      Update Likes
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 2: Add Fake / Custom Comment */}
+                <div className="space-y-3 p-4 rounded-2xl bg-white/5 border border-white/5">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                    Add Custom / Fake Comment
+                  </h4>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Author Name (e.g. Ramesh Kumar)"
+                      value={fakeCommentAuthor}
+                      onChange={(e) => setFakeCommentAuthor(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#050505] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#42E8FF]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Avatar Image URL (Optional)"
+                      value={fakeCommentAvatar}
+                      onChange={(e) => setFakeCommentAvatar(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#050505] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#42E8FF]"
+                    />
+                    <textarea
+                      rows={2}
+                      placeholder="Comment content text..."
+                      value={fakeCommentContent}
+                      onChange={(e) => setFakeCommentContent(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#050505] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#42E8FF] resize-none"
+                    />
+                    <button
+                      onClick={() => handleAddFakeComment(activeManagePost.id)}
+                      className="w-full py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs"
+                    >
+                      Add Comment
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 3: Existing Comments List */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-[#A0A7B5] uppercase tracking-wider">
+                    Existing Comments ({activeManagePost.comments?.length || 0})
+                  </h4>
+                  {(!activeManagePost.comments || activeManagePost.comments.length === 0) ? (
+                    <p className="text-xs text-[#A0A7B5] italic">No comments on this post.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {activeManagePost.comments.map((c) => (
+                        <div key={c.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-xs text-white">{c.author}</span>
+                              <span className="text-[10px] text-[#A0A7B5]">{c.timestamp}</span>
+                            </div>
+                            <p className="text-xs text-[#A0A7B5] mt-1">{c.content}</p>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteComment(activeManagePost.id, c.id)}
+                            className="p-1 text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                            title="Delete comment"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -717,47 +1090,46 @@ export default function VyavasthapakAdminPage() {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-[#A0A7B5] uppercase tracking-wider mb-1.5">
-                    Attach Image / Chart (Optional)
+                    Attach Media Files (Photos / Videos)
                   </label>
                   
-                  {previewUrl ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#0D1624]">
-                      <img src={previewUrl} alt="Upload preview" className="w-full h-48 object-cover" />
-                      <button
-                        type="button"
-                        onClick={handleRemovePhoto}
-                        className="absolute top-3 right-3 p-1.5 rounded-full bg-black/70 text-white hover:bg-red-500 transition-colors"
-                        title="Remove photo"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                  {previews.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {previews.map((item, idx) => (
+                        <div key={idx} className="relative rounded-xl overflow-hidden border border-white/10 bg-[#0D1624] aspect-[16/9]">
+                          {item.isVideo ? (
+                            <video src={item.url} controls className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={item.url} alt={`Upload preview ${idx}`} className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMedia(idx)}
+                            className="absolute top-2 right-2 p-1 rounded-full bg-black/80 text-white hover:bg-red-500 transition-colors"
+                            title="Remove file"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-white/10 hover:border-[#42E8FF]/40 rounded-2xl p-6 text-center bg-[#0D1624]/60 cursor-pointer transition-all group"
-                    >
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                      <UploadCloud className="w-8 h-8 mx-auto text-[#A0A7B5] group-hover:text-[#42E8FF] transition-colors mb-2" />
-                      <p className="text-xs font-semibold text-white">Click to upload an image from your device</p>
-                      <p className="text-[10px] text-[#A0A7B5] mt-1">Supports PNG, JPG, WEBP, GIF</p>
-                    </div>
-                  )}
+                  ) : null}
 
-                  <div className="mt-3">
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-white/10 hover:border-[#42E8FF]/40 rounded-2xl p-5 text-center bg-[#0D1624]/60 cursor-pointer transition-all group"
+                  >
                     <input
-                      type="text"
-                      value={bulletinImageUrl}
-                      onChange={(e) => setBulletinImageUrl(e.target.value)}
-                      placeholder="Or enter image URL (e.g. /chairman_message.png or https://...)"
-                      className="w-full px-4 py-2 rounded-xl bg-[#0D1624] border border-white/10 focus:border-[#42E8FF] text-xs text-white placeholder:text-gray-600 focus:outline-none"
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFilesChange}
+                      accept="image/*,video/*"
+                      multiple
+                      className="hidden"
                     />
+                    <UploadCloud className="w-7 h-7 mx-auto text-[#A0A7B5] group-hover:text-[#42E8FF] transition-colors mb-2" />
+                    <p className="text-xs font-semibold text-white">Click to upload multiple photos or videos</p>
+                    <p className="text-[10px] text-[#A0A7B5] mt-1">Supports JPG, PNG, WEBP, MP4, WEBM</p>
                   </div>
                 </div>
 

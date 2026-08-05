@@ -70,15 +70,12 @@ def verify_admin_token(token: Optional[str] = Depends(oauth2_scheme)) -> str:
             detail="Admin authentication required. Missing authorization header.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    if token == "vyavasthapak_admin_token_2026":
-        return "admin@vyavasthapak"
         
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         role: str = payload.get("role", "")
         email: str = payload.get("sub", "")
-        if role == "admin" or email in ["shobin@pulseofprofit.io", "techkaran401@gmail.com", "admin@vyavasthapak"]:
+        if role == "admin":
             return email or "admin"
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

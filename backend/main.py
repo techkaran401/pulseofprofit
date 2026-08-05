@@ -51,6 +51,7 @@ class Post(BaseModel):
     comments_count: int
     comments: List[Comment]
     imageUrl: Optional[str] = None
+    mediaUrls: Optional[List[str]] = []
     isLiked: Optional[bool] = False
     isReposted: Optional[bool] = False
 
@@ -58,16 +59,19 @@ class PostCreate(BaseModel):
     title: str
     content: str
     imageUrl: Optional[str] = None
+    mediaUrls: Optional[List[str]] = []
     author: Optional[str] = None
 
 class Profile(BaseModel):
     email: str
     name: str
+    mob_no: Optional[str] = ""
     avatar: str
     bio: str
 
 class ProfileUpdate(BaseModel):
     name: str
+    mob_no: Optional[str] = ""
     bio: str
 
 class CommentCreate(BaseModel):
@@ -76,12 +80,31 @@ class CommentCreate(BaseModel):
 
 class UserRegister(BaseModel):
     name: str
+    mob_no: str
     email: EmailStr
     password: str
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class AdminRegister(BaseModel):
+    name: str
+    mob_no: str
+    email: EmailStr
+    passcode: str
+
+class AdminLogin(BaseModel):
+    email: Optional[EmailStr] = None
+    passcode: str
+
+class ManualLikesUpdate(BaseModel):
+    likes: int
+
+class ManualCommentCreate(BaseModel):
+    author: str
+    content: str
+    avatar: Optional[str] = None
 
 class AuthResponse(BaseModel):
     access_token: str
@@ -96,38 +119,33 @@ def register(user_in: UserRegister):
     hashed_pwd = hash_password(user_in.password)
     avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_in.name}"
 
+    user_doc = {
+        "email": email,
+        "name": user_in.name,
+        "mob_no": user_in.mob_no,
+        "hashed_password": hashed_pwd,
+        "avatar": avatar,
+        "bio": "Member of Pulse of Profit community.",
+        "role": "user",
+        "created_at": datetime.now()
+    }
+
     if mongo_manager.is_connected and mongo_manager.db is not None:
         users_col = mongo_manager.db["users"]
         if users_col.find_one({"email": email}):
             raise HTTPException(status_code=400, detail="User with this email already exists")
-        
-        user_doc = {
-            "email": email,
-            "name": user_in.name,
-            "hashed_password": hashed_pwd,
-            "avatar": avatar,
-            "bio": "Member of Pulse of Profit community.",
-            "created_at": datetime.now()
-        }
         users_col.insert_one(user_doc)
     else:
         for u in mongo_manager.in_memory_users:
             if u["email"] == email:
                 raise HTTPException(status_code=400, detail="User with this email already exists")
-        user_doc = {
-            "email": email,
-            "name": user_in.name,
-            "hashed_password": hashed_pwd,
-            "avatar": avatar,
-            "bio": "Member of Pulse of Profit community.",
-            "created_at": datetime.now()
-        }
         mongo_manager.in_memory_users.append(user_doc)
 
     token = create_access_token({"sub": email})
     user_profile = Profile(
         email=email,
         name=user_in.name,
+        mob_no=user_in.mob_no,
         avatar=avatar,
         bio="Member of Pulse of Profit community."
     )
@@ -155,6 +173,7 @@ def login(user_in: UserLogin):
     user_profile = Profile(
         email=found_user["email"],
         name=found_user["name"],
+        mob_no=found_user.get("mob_no", ""),
         avatar=found_user["avatar"],
         bio=found_user.get("bio", "Member of Pulse of Profit community.")
     )
@@ -173,6 +192,7 @@ def get_me(user_email: Optional[str] = Depends(get_current_user_email)):
             return Profile(
                 email=found["email"],
                 name=found["name"],
+                mob_no=found.get("mob_no", ""),
                 avatar=found["avatar"],
                 bio=found.get("bio", "Member of Pulse of Profit community.")
             )
@@ -182,6 +202,51 @@ def get_me(user_email: Optional[str] = Depends(get_current_user_email)):
                 return Profile(
                     email=u["email"],
                     name=u["name"],
+                    mob_no=u.get("mob_no", ""),
+                    avatar=u["avatar"],
+                    bio=u.get("bio", "Member of Pulse of Profit community.")
+                )
+    
+    raise HTTPException(status_code=404, detail="User profile not found")
+
+@app.post("/api/profile", response_model=Profile)
+def update_profile(
+    profile_data: ProfileUpdate, 
+    user_email: Optional[str] = Depends(get_current_user_email)
+):
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        users_col = mongo_manager.db["users"]
+        users_col.update_one(
+            {"email": user_email},
+            {"$set": {
+                "name": profile_data.name, 
+                "bio": profile_data.bio,
+                "mob_no": profile_data.mob_no or ""
+            }}
+        )
+        found = users_col.find_one({"email": user_email})
+        if found:
+            return Profile(
+                email=found["email"],
+                name=found["name"],
+                mob_no=found.get("mob_no", ""),
+                avatar=found["avatar"],
+                bio=found.get("bio", "Member of Pulse of Profit community.")
+            )
+    else:
+        for u in mongo_manager.in_memory_users:
+            if u["email"] == user_email:
+                u["name"] = profile_data.name
+                u["bio"] = profile_data.bio
+                if profile_data.mob_no:
+                    u["mob_no"] = profile_data.mob_no
+                return Profile(
+                    email=u["email"],
+                    name=u["name"],
+                    mob_no=u.get("mob_no", ""),
                     avatar=u["avatar"],
                     bio=u.get("bio", "Member of Pulse of Profit community.")
                 )
@@ -204,9 +269,28 @@ async def upload_photo(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
 
+@app.post("/api/upload-multiple")
+async def upload_multiple(files: List[UploadFile] = File(...)):
+    uploaded_urls = []
+    try:
+        for file in files:
+            extension = os.path.splitext(file.filename)[1]
+            unique_name = f"{uuid.uuid4()}{extension}"
+            file_path = os.path.join(UPLOADS_DIR, unique_name)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            uploaded_urls.append(f"/uploads/{unique_name}")
+        return {"urls": uploaded_urls}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload files: {str(e)}")
+
 # --- POSTS ENDPOINTS ---
 
 def format_post_dict(doc: dict) -> dict:
+    media_list = doc.get("mediaUrls", [])
+    if not media_list and doc.get("imageUrl"):
+        media_list = [doc.get("imageUrl")]
+        
     return {
         "id": str(doc.get("id", doc.get("_id"))),
         "title": doc.get("title", ""),
@@ -218,6 +302,7 @@ def format_post_dict(doc: dict) -> dict:
         "comments_count": doc.get("comments_count", len(doc.get("comments", []))),
         "comments": doc.get("comments", []),
         "imageUrl": doc.get("imageUrl"),
+        "mediaUrls": media_list,
         "isLiked": doc.get("isLiked", False),
         "isReposted": doc.get("isReposted", False)
     }
@@ -254,6 +339,10 @@ def create_post(post_in: PostCreate, user_email: Optional[str] = Depends(get_cur
     now_str = datetime.now().strftime("%d %B %Y")
     post_id = str(uuid.uuid4().hex[:8])
 
+    media_list = post_in.mediaUrls or []
+    if not media_list and post_in.imageUrl:
+        media_list = [post_in.imageUrl]
+
     post_doc = {
         "id": post_id,
         "title": post_in.title or "PULSE OF PROFIT BULLETIN 🗞️",
@@ -265,6 +354,7 @@ def create_post(post_in: PostCreate, user_email: Optional[str] = Depends(get_cur
         "comments_count": 0,
         "comments": [],
         "imageUrl": post_in.imageUrl,
+        "mediaUrls": media_list,
         "isLiked": False,
         "isReposted": False,
         "created_at": datetime.now()
@@ -428,16 +518,72 @@ def update_profile(profile_in: ProfileUpdate, user_email: Optional[str] = Depend
 
 # --- VYAVASTHAPAK (ADMIN) ENDPOINTS ---
 
-class AdminLogin(BaseModel):
-    passcode: str
+@app.get("/api/vyavasthapak/has-admin")
+def vyavasthapak_has_admin():
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        count = mongo_manager.db["users"].count_documents({"role": "admin"})
+        return {"has_admin": count > 0}
+    count = sum(1 for u in mongo_manager.in_memory_users if u.get("role") == "admin")
+    return {"has_admin": count > 0}
+
+@app.post("/api/vyavasthapak/register")
+def vyavasthapak_register(admin_in: AdminRegister):
+    email = admin_in.email.lower()
+    hashed_pwd = hash_password(admin_in.passcode)
+    avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={admin_in.name}"
+    
+    admin_doc = {
+        "email": email,
+        "name": admin_in.name,
+        "mob_no": admin_in.mob_no,
+        "hashed_password": hashed_pwd,
+        "avatar": avatar,
+        "role": "admin",
+        "is_blocked": False,
+        "created_at": datetime.now()
+    }
+
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        users_col = mongo_manager.db["users"]
+        if users_col.find_one({"email": email}):
+            raise HTTPException(status_code=400, detail="Admin with this email already exists")
+        users_col.insert_one(admin_doc)
+    else:
+        for u in mongo_manager.in_memory_users:
+            if u["email"] == email:
+                raise HTTPException(status_code=400, detail="Admin with this email already exists")
+        mongo_manager.in_memory_users.append(admin_doc)
+        mongo_manager.in_memory_admins.append(admin_doc)
+
+    token = create_access_token({"sub": email, "role": "admin"})
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": "admin",
+        "message": "Admin Registered Successfully"
+    }
 
 @app.post("/api/vyavasthapak/login")
 def vyavasthapak_login(login_in: AdminLogin):
-    allowed_passcodes = ["vyavasthapak2026"]
-    if login_in.passcode not in allowed_passcodes:
-        raise HTTPException(status_code=401, detail="Invalid Vyavasthapak passcode")
+    found_admin = None
     
-    token = create_access_token({"sub": "admin@vyavasthapak", "role": "admin"})
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        users_col = mongo_manager.db["users"]
+        if login_in.email:
+            found_admin = users_col.find_one({"email": login_in.email.lower(), "role": "admin"})
+        else:
+            found_admin = users_col.find_one({"role": "admin"})
+    else:
+        for u in mongo_manager.in_memory_users:
+            if u.get("role") == "admin":
+                if not login_in.email or u.get("email") == login_in.email.lower():
+                    found_admin = u
+                    break
+                    
+    if not found_admin or not verify_password(login_in.passcode, found_admin["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Invalid admin credentials or passcode")
+        
+    token = create_access_token({"sub": found_admin["email"], "role": "admin"})
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -492,6 +638,10 @@ def vyavasthapak_create_post(post_in: PostCreate, admin_user: str = Depends(veri
     now_str = datetime.now().strftime("%d %B %Y")
     post_id = str(uuid.uuid4().hex[:8])
 
+    media_list = post_in.mediaUrls or []
+    if not media_list and post_in.imageUrl:
+        media_list = [post_in.imageUrl]
+
     post_doc = {
         "id": post_id,
         "title": post_in.title or "PULSE OF PROFIT BULLETIN 🗞️",
@@ -503,6 +653,7 @@ def vyavasthapak_create_post(post_in: PostCreate, admin_user: str = Depends(veri
         "comments_count": 0,
         "comments": [],
         "imageUrl": post_in.imageUrl,
+        "mediaUrls": media_list,
         "isLiked": False,
         "isReposted": False,
         "created_at": datetime.now()
@@ -514,6 +665,83 @@ def vyavasthapak_create_post(post_in: PostCreate, admin_user: str = Depends(veri
         mongo_manager.in_memory_posts.insert(0, post_doc)
 
     return format_post_dict(post_doc)
+
+@app.post("/api/vyavasthapak/posts/{post_id}/manual-likes")
+def vyavasthapak_update_likes(post_id: str, likes_in: ManualLikesUpdate, admin_user: str = Depends(verify_admin_token)):
+    if likes_in.likes < 0:
+        raise HTTPException(status_code=400, detail="Likes count cannot be negative")
+
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        posts_col = mongo_manager.db["posts"]
+        p = posts_col.find_one({"id": post_id})
+        if not p:
+            raise HTTPException(status_code=404, detail="Post not found")
+        posts_col.update_one({"id": post_id}, {"$set": {"likes": likes_in.likes}})
+        p["likes"] = likes_in.likes
+        return format_post_dict(p)
+    else:
+        for p in mongo_manager.in_memory_posts:
+            if p["id"] == post_id:
+                p["likes"] = likes_in.likes
+                return format_post_dict(p)
+
+    raise HTTPException(status_code=404, detail="Post not found")
+
+@app.post("/api/vyavasthapak/posts/{post_id}/manual-comments")
+def vyavasthapak_add_comment(post_id: str, comment_in: ManualCommentCreate, admin_user: str = Depends(verify_admin_token)):
+    avatar_url = comment_in.avatar or f"https://api.dicebear.com/7.x/avataaars/svg?seed={comment_in.author}"
+    new_comment = {
+        "id": f"c_{uuid.uuid4().hex[:6]}",
+        "author": comment_in.author,
+        "avatar": avatar_url,
+        "content": comment_in.content,
+        "timestamp": "Just now"
+    }
+
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        posts_col = mongo_manager.db["posts"]
+        p = posts_col.find_one({"id": post_id})
+        if p:
+            comments = p.get("comments", [])
+            comments.append(new_comment)
+            posts_col.update_one(
+                {"id": post_id},
+                {"$set": {"comments": comments, "comments_count": len(comments)}}
+            )
+            p["comments"] = comments
+            p["comments_count"] = len(comments)
+            return format_post_dict(p)
+    else:
+        for p in mongo_manager.in_memory_posts:
+            if p["id"] == post_id:
+                p.setdefault("comments", []).append(new_comment)
+                p["comments_count"] = len(p["comments"])
+                return format_post_dict(p)
+
+    raise HTTPException(status_code=404, detail="Post not found")
+
+@app.delete("/api/vyavasthapak/posts/{post_id}/comments/{comment_id}")
+def vyavasthapak_delete_comment(post_id: str, comment_id: str, admin_user: str = Depends(verify_admin_token)):
+    if mongo_manager.is_connected and mongo_manager.db is not None:
+        posts_col = mongo_manager.db["posts"]
+        p = posts_col.find_one({"id": post_id})
+        if p:
+            comments = [c for c in p.get("comments", []) if c.get("id") != comment_id]
+            posts_col.update_one(
+                {"id": post_id},
+                {"$set": {"comments": comments, "comments_count": len(comments)}}
+            )
+            p["comments"] = comments
+            p["comments_count"] = len(comments)
+            return format_post_dict(p)
+    else:
+        for p in mongo_manager.in_memory_posts:
+            if p["id"] == post_id:
+                p["comments"] = [c for c in p.get("comments", []) if c.get("id") != comment_id]
+                p["comments_count"] = len(p["comments"])
+                return format_post_dict(p)
+
+    raise HTTPException(status_code=404, detail="Post not found")
 
 @app.delete("/api/vyavasthapak/posts/{post_id}")
 def vyavasthapak_delete_post(post_id: str, admin_user: str = Depends(verify_admin_token)):
@@ -542,6 +770,7 @@ def vyavasthapak_get_users(admin_user: str = Depends(verify_admin_token)):
             clean_users.append({
                 "email": u["email"],
                 "name": u["name"],
+                "mob_no": u.get("mob_no", ""),
                 "avatar": u.get("avatar", ""),
                 "role": u.get("role", "user"),
                 "is_blocked": u.get("is_blocked", False),
@@ -554,6 +783,7 @@ def vyavasthapak_get_users(admin_user: str = Depends(verify_admin_token)):
         clean_users.append({
             "email": u["email"],
             "name": u["name"],
+            "mob_no": u.get("mob_no", ""),
             "avatar": u.get("avatar", ""),
             "role": u.get("role", "user"),
             "is_blocked": u.get("is_blocked", False),

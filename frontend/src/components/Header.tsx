@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Sun, Moon, User, Menu, Bell, CheckCheck, Trash2, Sparkles, Activity } from 'lucide-react';
+import { Search, Sun, Moon, User, Menu, Bell, CheckCheck, Trash2, Sparkles, Activity, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
@@ -26,8 +26,35 @@ export default function Header({
 }: HeaderProps) {
   const { user, logout, openAuthModal } = useAuth();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  useEffect(() => {
+    const handleOutsideInteraction = (event: MouseEvent | TouchEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsNotificationsOpen(false);
+      }
+    };
+
+    if (isNotificationsOpen) {
+      document.addEventListener('mousedown', handleOutsideInteraction);
+      document.addEventListener('touchstart', handleOutsideInteraction);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideInteraction);
+      document.removeEventListener('touchstart', handleOutsideInteraction);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isNotificationsOpen]);
 
   const handleMarkAllRead = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,7 +112,7 @@ export default function Header({
         <div className="flex items-center space-x-2.5 sm:space-x-3">
           
           {/* Notification Bell */}
-          <div className="relative">
+          <div className="relative" ref={notificationRef}>
             <button 
               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
               className="p-2.5 rounded-full bg-[#0D1624]/90 border border-white/10 hover:border-[#42E8FF]/40 text-[#A0A7B5] hover:text-white transition-all relative backdrop-blur-md" 
@@ -102,8 +129,9 @@ export default function Header({
             {isNotificationsOpen && (
               <>
                 <div 
-                  className="fixed inset-0 z-30" 
-                  onClick={() => setIsNotificationsOpen(false)} 
+                  className="fixed inset-0 z-30 cursor-pointer" 
+                  onClick={() => setIsNotificationsOpen(false)}
+                  onTouchStart={() => setIsNotificationsOpen(false)}
                 />
                 
                 <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-96 max-w-sm rounded-[20px] glass-panel p-4 z-40 text-white font-sans border border-white/10 shadow-2xl">
@@ -116,7 +144,7 @@ export default function Header({
                         </span>
                       )}
                     </h3>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
                       <button 
                         onClick={handleMarkAllRead}
                         className="p-1 rounded hover:bg-white/10 text-[#A0A7B5] hover:text-white transition-colors text-xs"
@@ -130,6 +158,13 @@ export default function Header({
                         title="Clear all"
                       >
                         <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setIsNotificationsOpen(false)}
+                        className="p-1 rounded hover:bg-white/10 text-[#A0A7B5] hover:text-white transition-colors text-xs"
+                        title="Close notifications"
+                      >
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -173,30 +208,21 @@ export default function Header({
 
           {/* User Auth & Profile Controls */}
           {user ? (
-            <div className="flex items-center space-x-2">
-              <button 
-                onClick={onProfileClick}
-                className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-[#0D1624] border border-emerald-500/30 hover:border-emerald-400 transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)]"
-                aria-label="Open user menu"
-              >
-                <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full bg-slate-800" />
-                <span className="text-xs font-semibold text-white max-w-[100px] truncate hidden sm:inline">{user.name}</span>
-              </button>
-              <button
-                onClick={logout}
-                className="text-xs font-medium text-slate-400 hover:text-rose-400 px-2 py-1 transition-colors"
-                title="Sign out"
-              >
-                Logout
-              </button>
-            </div>
+            <button 
+              onClick={onProfileClick}
+              className="flex items-center p-2 rounded-full bg-[#0D1624] border border-emerald-500/30 hover:border-emerald-400 transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)]"
+              aria-label="Open user menu"
+              title="Profile Menu"
+            >
+              <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full bg-slate-800" />
+            </button>
           ) : (
             <button
-              onClick={() => openAuthModal('login')}
+              onClick={() => openAuthModal('register')}
               className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all"
             >
               <User className="w-3.5 h-3.5" />
-              <span>Sign In</span>
+              <span>Register</span>
             </button>
           )}
         </div>

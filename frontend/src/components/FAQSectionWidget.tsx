@@ -18,8 +18,8 @@ const faqs: FAQItem[] = [
     answer: 'Yes! All daily Pulse of Profit Bulletins, pinned posts, market updates, and Telegram community highlights are free forever. Pro AI features add live algorithmic signals, interactive charts, and custom alerts.'
   },
   {
-    question: 'Can I bookmark posts and subscribe to specific financial authors?',
-    answer: 'Absolutely. You can subscribe to top analysts like SHOBIN SHEIKH, save bulletins to your private library, bookmark key market updates, and manage your preferences in your Profile Drawer.'
+    question: 'Can I bookmark posts and save key market bulletins?',
+    answer: 'Absolutely. You can save official market bulletins to your private library, bookmark key market updates, and manage your preferences in your Profile Drawer.'
   },
   {
     question: 'How quickly is market data updated on the platform?',

@@ -17,6 +17,7 @@ class MongoManager:
         self.is_connected = False
         self.in_memory_posts: List[Dict[str, Any]] = []
         self.in_memory_users: List[Dict[str, Any]] = []
+        self.in_memory_admins: List[Dict[str, Any]] = []
         self.in_memory_reports: List[Dict[str, Any]] = []
         self.in_memory_profiles: Dict[str, Dict[str, Any]] = {}
         self.connect()
@@ -41,6 +42,7 @@ class MongoManager:
                 {
                     "email": "shobin@pulseofprofit.io",
                     "name": "Shobin Sheikh",
+                    "mob_no": "+91 9876543210",
                     "hashed_password": "pbkdf2:sha256:...",
                     "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Shobin",
                     "bio": "Lead Market Analyst & Pulse of Profit Founder",
@@ -51,6 +53,7 @@ class MongoManager:
                 {
                     "email": "techkaran401@gmail.com",
                     "name": "Karan",
+                    "mob_no": "+91 9876543211",
                     "hashed_password": "pbkdf2:sha256:...",
                     "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Karan",
                     "bio": "Interested in financial markets, business analysis, and global economy updates.",
@@ -61,6 +64,7 @@ class MongoManager:
                 {
                     "email": "rohit@example.com",
                     "name": "Rohit Sharma",
+                    "mob_no": "+91 9876543212",
                     "hashed_password": "pbkdf2:sha256:...",
                     "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Rohit",
                     "bio": "Equity Trader & Momentum Specialist",
@@ -71,6 +75,7 @@ class MongoManager:
                 {
                     "email": "anjali@example.com",
                     "name": "Anjali Gupta",
+                    "mob_no": "+91 9876543213",
                     "hashed_password": "pbkdf2:sha256:...",
                     "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Anjali",
                     "bio": "Macro-economic enthusiast",

@@ -58,14 +58,16 @@ export default function AuthModal() {
           <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Close Button - Always accessible to dismiss modal */}
-          <button
-            onClick={closeAuthModal}
-            className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/60 p-2 rounded-xl transition-colors"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Close Button - Accessible to dismiss modal when logged in */}
+          {user && (
+            <button
+              onClick={closeAuthModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-800/60 p-2 rounded-xl transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Title Header */}
           <div className="text-center mb-6">
@@ -183,15 +185,6 @@ export default function AuthModal() {
               )}
             </button>
 
-            {!user && (
-              <button
-                type="button"
-                onClick={closeAuthModal}
-                className="w-full text-center text-xs text-slate-400 hover:text-slate-200 transition-colors pt-2 underline underline-offset-4"
-              >
-                Skip & Continue as Guest
-              </button>
-            )}
           </form>
         </motion.div>
       </div>

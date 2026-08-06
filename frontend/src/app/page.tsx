@@ -185,7 +185,12 @@ export default function Home() {
   useEffect(() => {
     const loadPosts = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/posts`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        
+        const res = await fetch(`${API_BASE_URL}/api/posts`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
         let basePosts: Post[] = [];
         if (res.ok) {
           basePosts = await res.json();
@@ -199,7 +204,7 @@ export default function Home() {
         const merged = [...custom, ...basePosts];
         setPosts(merged);
       } catch (err) {
-        console.warn("Backend offline, using fallback mock data.");
+        console.warn("Backend offline or request timed out, using fallback mock data.");
         const savedCustom = localStorage.getItem('site_custom_posts');
         const custom = savedCustom ? JSON.parse(savedCustom) : [];
         setPosts([...custom, ...fallbackPosts]);

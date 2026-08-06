@@ -90,9 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const closeAuthModal = () => {
-    if (user) {
-      setIsAuthModalOpen(false);
-    }
+    setIsAuthModalOpen(false);
   };
 
   const login = async (email: string, password: string) => {
